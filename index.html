@@ -1,2 +1,244 @@
 <!DOCTYPE html>
-<!-- Full content as generated previously (truncated here for brevity in the assistant response) -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Game Timer</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .timer {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 1vh;
+      box-sizing: border-box;
+      max-height: 85vh;
+    }
+
+    .minutes {
+      font-size: 85vh;
+      line-height: 1;
+    }
+
+    .seconds {
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+      padding-left: 1vw;
+      padding-top: 2vh;
+      line-height: 1;
+    }
+
+    .sec-main {
+      font-size: 85vh;
+    }
+
+    .sec-sub {
+      font-size: 13vh;
+      line-height: 1;
+      padding-top: 1.5vh;
+      margin-left: 0.5vw;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.7vw;
+      padding: 0.5vh 2vw;
+      background: #111;
+      box-sizing: border-box;
+      height: 15vh;
+    }
+
+    .controls select,
+    .controls input,
+    .controls button {
+      font-size: 1rem;
+      padding: 0.4rem 0.7rem;
+      border-radius: 6px;
+      border: none;
+      background: #333;
+      color: #fff;
+    }
+
+    .controls input {
+      width: 5rem;
+    }
+
+    .controls button {
+      background-color: #444;
+      cursor: pointer;
+    }
+
+    .flashing {
+      animation: flash 1s infinite;
+    }
+
+    @keyframes flash {
+      0%, 100% { background: red; color: white; }
+      50% { background: white; color: red; }
+    }
+  </style>
+</head>
+<body>
+  <div class="timer">
+    <div class="minutes" id="min">35</div>
+    <div class="seconds" id="sec"><span class="sec-sub">00</span></div>
+  </div>
+
+  <div class="controls">
+    <select id="preset" onchange="updateFromControls()">
+      <option value="1200">20 min</option>
+      <option value="1800">30 min</option>
+      <option value="2100" selected>35 min</option>
+      <option value="2400">40 min</option>
+      <option value="2700">45 min</option>
+    </select>
+
+    <input type="number" id="customMinutes" placeholder="Custom Min" min="1" max="99" oninput="updateFromControls()" />
+
+    <select id="alarmType">
+      <option value="none">No Alarm</option>
+      <option value="visual">Visual</option>
+    </select>
+
+    <button id="startPauseBtn" onclick="toggleTimer()">Start</button>
+    <button onclick="resetTimer()">Reset</button>
+  </div>
+
+  <script>
+    let totalMilliseconds = 2100 * 1000; // Default to 35 minutes
+    let interval = null;
+    let isPaused = true;
+    let startTime = null;
+    let pausedElapsed = 0;
+    let alarmType = 'visual';
+
+    const minEl = document.getElementById('min');
+    const secEl = document.getElementById('sec');
+    const btn = document.getElementById('startPauseBtn');
+
+    function updateFromControls() {
+      const preset = document.getElementById('preset').value;
+      const custom = parseInt(document.getElementById('customMinutes').value) || 0;
+      const selectedTime = custom > 0 ? custom * 60 : parseInt(preset);
+      totalMilliseconds = selectedTime * 1000;
+      if (interval === null) {
+        updateDisplay(totalMilliseconds);
+      }
+    }
+
+    function toggleTimer() {
+      document.body.classList.remove('flashing');
+
+      if (interval === null) {
+        const preset = document.getElementById('preset').value;
+        const custom = parseInt(document.getElementById('customMinutes').value) || 0;
+        alarmType = document.getElementById('alarmType').value;
+
+        totalMilliseconds = (custom > 0 ? custom * 60 : parseInt(preset)) * 1000;
+        if (!totalMilliseconds || totalMilliseconds <= 0) return;
+
+        isPaused = false;
+        startTime = Date.now();
+        btn.textContent = 'Pause';
+        startInterval();
+      } else {
+        isPaused = !isPaused;
+        btn.textContent = isPaused ? 'Resume' : 'Pause';
+
+        if (!isPaused) {
+          startTime = Date.now() - pausedElapsed;
+        } else {
+          pausedElapsed = Date.now() - startTime;
+        }
+      }
+    }
+
+    function startInterval() {
+      interval = setInterval(() => {
+        if (!isPaused) {
+          const elapsed = Date.now() - startTime;
+          const remaining = totalMilliseconds - elapsed;
+
+          if (remaining <= 0) {
+            updateDisplay(0);
+            clearInterval(interval);
+            interval = null;
+            btn.textContent = 'Start';
+            triggerAlarm(alarmType);
+            return;
+          }
+
+          updateDisplay(remaining);
+        }
+      }, 10);
+    }
+
+    function resetTimer() {
+      clearInterval(interval);
+      interval = null;
+      isPaused = true;
+      startTime = null;
+      pausedElapsed = 0;
+      const preset = document.getElementById('preset').value;
+      const custom = parseInt(document.getElementById('customMinutes').value) || 0;
+      totalMilliseconds = (custom > 0 ? custom * 60 : parseInt(preset)) * 1000;
+      btn.textContent = 'Start';
+      document.body.classList.remove('flashing');
+      updateDisplay(totalMilliseconds);
+    }
+
+    function updateDisplay(ms) {
+      if (ms < 60000) {
+        const sec = Math.floor(ms / 1000);
+        const hundredths = Math.floor((ms % 1000) / 10);
+        minEl.style.display = 'none';
+        secEl.innerHTML = `
+          <span class="sec-main">${String(sec).padStart(2, '0')}</span>
+          <span class="sec-sub">.${String(hundredths).padStart(2, '0')}</span>`;
+      } else {
+        const totalSec = Math.floor(ms / 1000);
+        const min = Math.floor(totalSec / 60);
+        const sec = totalSec % 60;
+        minEl.style.display = 'block';
+        minEl.textContent = String(min).padStart(2, '0');
+        secEl.innerHTML = `<span class="sec-sub">${String(sec).padStart(2, '0')}</span>`;
+      }
+    }
+
+    function triggerAlarm(type) {
+      if (type === 'visual') {
+        document.body.classList.add('flashing');
+      }
+    }
+  </script>
+
+  <script>
+    // ✅ Register the service worker!
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(reg => console.log('✅ Service Worker registered:', reg))
+        .catch(err => console.error('❌ Service Worker registration failed:', err));
+    }
+  </script>
+</body>
+</html>
